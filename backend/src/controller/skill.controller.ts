@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { skillRepository, tagRepository } from "../database/db";
 import { SkillI } from "../types/skillInterfaces";
+import { Tag } from "@prisma/client";
 
 export const createSkill = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -50,9 +51,9 @@ export const createSkill = async (request: FastifyRequest, reply: FastifyReply) 
 
 export const getSkills = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { page, pageSize } = request.query as { page: string, pageSize: string }
+        const { page, pageSize } = request.query as { page?: string, pageSize?: string }
 
-        if (+page === 0 || +pageSize === 0) {
+        if (!page || !pageSize) {
 
             const skills = await skillRepository.findMany({
                 include: {
@@ -77,12 +78,14 @@ export const getSkills = async (request: FastifyRequest, reply: FastifyReply) =>
     }
 }
 
-const getSkill = async (request: FastifyRequest, reply: FastifyReply) => {
+export const getSkill = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { skillId } = request.params as { skillId: string }
+        const { id } = request.params as { id: string }
+
+        console.log(request.params)
 
         const skill = await skillRepository.findUnique({
-            where: { id: +skillId }, include: {
+            where: { id: Number(id) }, include: {
                 tags: true
             }
         })
@@ -93,40 +96,33 @@ const getSkill = async (request: FastifyRequest, reply: FastifyReply) => {
     }
 }
 
-const updateSkill = async (request: FastifyRequest, reply: FastifyReply) {
+export const updateSkill = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { skillId } = request.params as { skillId: string }
+        const { id } = request.params as { id: string }
 
         const { name, type, description = "", duration, tags } = request.body as SkillI
 
-        const skillToUpdate = await skillRepository.findUnique({ where: { id: +skillId }, include: { tags: true } })
+        const skillToUpdate = await skillRepository.findUnique({ where: { id: +id }, include: { tags: true } })
 
         if (!skillToUpdate) return reply.status(404).send({ message: "Skill not found" })
 
-        const newData: Partial<SkillI> = {}
+        let tagsToSkill: any[] = []
 
-        const tags
-
-        if (tags) {
+        if (tags && tags.length > 0) {
             const normalizedTags = tags.map(t => t.trim().toUpperCase())
 
             const existingTags = await tagRepository.findMany({
-                where: {
-                    name: {
-                        in: normalizedTags
-                    }
-                }
+                where: { name: { in: normalizedTags } }
             })
 
-            const noExistingTags = [...new Set(normalizedTags).difference(new Set(existingTags.map(t => t.name)))]
-
+            const existingTagNames = new Set(existingTags.map(t => t.name))
+            const noExistingTags = normalizedTags.filter(t => !existingTagNames.has(t))
 
             const newTags = await tagRepository.createManyAndReturn({
                 data: noExistingTags.map(t => ({ name: t }))
             })
 
-            const tagsToSkill = [...existingTags, ...newTags]
-
+            tagsToSkill = [...existingTags, ...newTags]
         }
 
         skillToUpdate.name = name ? name : skillToUpdate.name
@@ -136,14 +132,22 @@ const updateSkill = async (request: FastifyRequest, reply: FastifyReply) {
 
 
 
-        const updatedSkill = skillRepository.update({
-            where: { id: +skillId },
+        const updatedSkill = await skillRepository.update({
+            where: {
+                id: +id
+            },
+            include: {
+                tags: true
+
+            }
+            ,
             data: {
                 name: skillToUpdate.name,
                 type: skillToUpdate.type,
                 description: skillToUpdate.description,
                 duration: skillToUpdate.duration,
                 tags: {
+                    set: [],
                     connect: tagsToSkill.map(t => ({ id: t.id }))
                 }
             }
