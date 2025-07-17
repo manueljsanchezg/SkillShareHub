@@ -1,0 +1,9 @@
+# General
+node_modules/
+dist/
+build/
+
+# Backend
+/backend/node_modules/
+/backend/build/
+

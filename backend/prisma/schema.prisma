@@ -1,0 +1,84 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  createdAt DateTime  @default(now())
+  name      String
+  surname   String
+  birthDate DateTime
+  email     String    @unique
+  password  String
+  role      Role
+  skills    Skill[]
+  wallet    Wallet?
+  sessions  Session[]
+}
+
+model Skill {
+  id          Int       @id @default(autoincrement())
+  name        String
+  type        String
+  description String?
+  duration    Float
+  user        User      @relation(fields: [userId], references: [id])
+  userId      Int
+  tags        Tag[]
+  Session     Session[]
+}
+
+model Tag {
+  id     Int     @id @default(autoincrement())
+  name   String @unique
+  skills Skill[]
+}
+
+model Wallet {
+  id                   Int           @id @default(autoincrement())
+  amount               Float
+  user                 User          @relation(fields: [userId], references: [id])
+  userId               Int           @unique
+  sentTransactions     Transaction[] @relation("SentTransactions")
+  receivedTransactions Transaction[] @relation("ReceivedTransactions")
+}
+
+model Session {
+  id           Int           @id @default(autoincrement())
+  date         DateTime
+  status       Status
+  level        String
+  user         User          @relation(fields: [userId], references: [id])
+  userId       Int
+  skill        Skill         @relation(fields: [skillId], references: [id])
+  skillId      Int
+  transactions Transaction[]
+}
+
+model Transaction {
+  id               Int      @id @default(autoincrement())
+  createdAt        DateTime @default(now())
+  amount           Float
+  senderWallet     Wallet   @relation("SentTransactions", fields: [senderWalletId], references: [id])
+  senderWalletId   Int
+  receiverWallet   Wallet   @relation("ReceivedTransactions", fields: [receiverWalletId], references: [id])
+  receiverWalletId Int
+  session          Session? @relation(fields: [sessionId], references: [id])
+  sessionId        Int?
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Status {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
