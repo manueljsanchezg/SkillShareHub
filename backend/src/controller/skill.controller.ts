@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { skillRepository, tagRepository } from "../database/db";
+import { skillRepository, tagRepository } from "../database/db.ts";
 import { SkillI } from "../types/skillInterfaces";
 import { Tag } from "@prisma/client";
 
@@ -82,13 +82,13 @@ export const getSkill = async (request: FastifyRequest, reply: FastifyReply) => 
     try {
         const { id } = request.params as { id: string }
 
-        console.log(request.params)
-
         const skill = await skillRepository.findUnique({
             where: { id: Number(id) }, include: {
                 tags: true
             }
         })
+
+        if (!skill) return reply.status(404).send({ message: "Skill not found" })
 
         return reply.status(200).send(skill)
     } catch (error) {
@@ -106,7 +106,7 @@ export const updateSkill = async (request: FastifyRequest, reply: FastifyReply) 
 
         if (!skillToUpdate) return reply.status(404).send({ message: "Skill not found" })
 
-        let tagsToSkill: any[] = []
+        let tagsToSkill: Tag[] = []
 
         if (tags && tags.length > 0) {
             const normalizedTags = tags.map(t => t.trim().toUpperCase())
@@ -154,6 +154,24 @@ export const updateSkill = async (request: FastifyRequest, reply: FastifyReply) 
         })
 
         return reply.status(200).send(updatedSkill)
+    } catch (error) {
+        return reply.status(500).send({ message: "Internal Server Error", error })
+    }
+}
+
+export const deleteSkil = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = request.params as { id: string }
+
+        const result = await skillRepository.deleteMany({
+            where: { id: +id }
+        })
+
+        if(result.count === 0) {
+            return reply.status(401).send({ message: "Skill not found"})
+        }
+
+        return reply.status(200).send({ message: "Skill deleted"})
     } catch (error) {
         return reply.status(500).send({ message: "Internal Server Error", error })
     }

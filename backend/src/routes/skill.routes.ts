@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify"
 import { createSkill, getSkills, getSkill, updateSkill } from "../controller/skill.controller"
-import { authenticate, checkRole } from "../middlewares/authMiddleware"
+import { checkRole } from "../middlewares/authMiddleware"
 import { Role } from "@prisma/client"
 import { createSkillSchema, getSkillSchema, updateSkillSchema } from "../schemas/skill.schema"
 

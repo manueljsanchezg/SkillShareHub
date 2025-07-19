@@ -20,12 +20,14 @@ export const getUsers = async (request: FastifyRequest, reply: FastifyReply) => 
 
 export const getUser = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { userId } = request.params as { userId: string }
+        const { id } = request.params as { id: string }
 
-        const user = await userRepository.findUnique({ where: { id: +userId } })
+        const user = await userRepository.findUnique({ where: { id: +id } })
+
+        if (!user) return reply.status(404).send({ message: "User not found" })
 
         return reply.status(200).send(user)
     } catch (error) {
-        return reply.status(500).send({ message: "Internal Server Error" })
+        return reply.status(500).send({ message: "Internal Server Error", error })
     }
 }

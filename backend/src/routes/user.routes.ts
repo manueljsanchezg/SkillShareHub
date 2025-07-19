@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { authenticate, checkRole } from "../middlewares/authMiddleware";
-import { getUsers } from "../controller/user.controller";
+import { checkRole } from "../middlewares/authMiddleware";
+import { getUser, getUsers } from "../controller/user.controller";
 import { getUsersSchema } from "../schemas/user.schema";
 import { Role } from "@prisma/client";
 
@@ -12,4 +12,5 @@ export default async function userRoutes(fastify: FastifyInstance) {
     })
 
     fastify.get("/", { schema: getUsersSchema, onRequest: [checkRole(Role.ADMIN)] }, getUsers)
+    fastify.get("/:id", { schema: getUsersSchema, onRequest: [checkRole(Role.ADMIN)] }, getUser)
 }

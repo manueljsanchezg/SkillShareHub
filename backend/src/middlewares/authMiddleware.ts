@@ -1,6 +1,5 @@
 import { Role } from "@prisma/client";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { userRepository } from "../database/db";
 
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   try {
@@ -19,7 +18,7 @@ export function checkRole(requiredRole: Role) {
       if(!role || role !== requiredRole) return reply.status(401).send({ message: "Unauthorized" })
 
     } catch (error) {
-      return reply.status(401).send({ message: "Unauthorized" });
+      return reply.status(401).send({ message: "Unauthorized", error });
     }
   }
 }

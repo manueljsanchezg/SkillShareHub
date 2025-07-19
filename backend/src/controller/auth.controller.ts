@@ -34,7 +34,7 @@ export const registerUser = async (request: FastifyRequest, reply: FastifyReply)
 
         return reply.status(201).send({ message: "User created" })
     } catch (error) {
-        return reply.status(500).send({ message: "Internal Server Error" })
+        return reply.status(500).send({ message: "Internal Server Error", error })
     }
 }
 
@@ -56,6 +56,6 @@ export const loginUser = async (request: FastifyRequest, reply: FastifyReply) =>
 
         return reply.status(200).send({ message: "User logged", jwtToken })
     } catch (error) {
-        return reply.status(500).send({ message: "Internal Server Error" })
+        return reply.status(500).send({ message: "Internal Server Error", error })
     }
 }
