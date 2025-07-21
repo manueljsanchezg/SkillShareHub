@@ -1,46 +1,49 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { skillRepository, tagRepository } from "../database/db.ts";
+import { prisma, skillRepository } from "../database/db.ts";
 import { SkillI } from "../types/skillInterfaces";
 import { Tag } from "@prisma/client";
 
 export const createSkill = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-
         const { userId } = request.user as { userId: string }
 
         const { name, type, description = "", duration, tags } = request.body as SkillI
 
         const normalizedTags = tags.map(t => t.trim().toUpperCase())
 
-        const existingTags = await tagRepository.findMany({
-            where: {
-                name: {
-                    in: normalizedTags
+        const newSkill = await prisma.$transaction(async (tx) => {
+
+            const existingTags = await tx.tag.findMany({
+                where: {
+                    name: {
+                        in: normalizedTags
+                    }
                 }
-            }
-        })
+            })
 
-        const noExistingTags = [...new Set(normalizedTags).difference(new Set(existingTags.map(t => t.name)))]
-
-
-        const newTags = await tagRepository.createManyAndReturn({
-            data: noExistingTags.map(t => ({ name: t }))
-        })
-
-        const tagsToSkill = [...existingTags, ...newTags]
+            const noExistingTags = [...new Set(normalizedTags).difference(new Set(existingTags.map(t => t.name)))]
 
 
-        const newSkill = await skillRepository.create({
-            data: {
-                name,
-                type,
-                description,
-                duration,
-                userId: +userId,
-                tags: {
-                    connect: tagsToSkill.map(t => ({ id: t.id }))
+            const newTags = await tx.tag.createManyAndReturn({
+                data: noExistingTags.map(t => ({ name: t }))
+            })
+
+            const tagsToSkill = [...existingTags, ...newTags]
+
+
+            const newSkill = await tx.skill.create({
+                data: {
+                    name,
+                    type,
+                    description,
+                    duration,
+                    userId: +userId,
+                    tags: {
+                        connect: tagsToSkill.map(t => ({ id: t.id }))
+                    }
                 }
-            }
+            })
+            return newSkill
         })
 
         return reply.status(201).send({ message: "Skill created", newSkill })
@@ -106,51 +109,55 @@ export const updateSkill = async (request: FastifyRequest, reply: FastifyReply) 
 
         if (!skillToUpdate) return reply.status(404).send({ message: "Skill not found" })
 
-        let tagsToSkill: Tag[] = []
+        const updatedSkill = await prisma.$transaction(async (tx) => {
+            let tagsToSkill: Tag[] = []
 
-        if (tags && tags.length > 0) {
-            const normalizedTags = tags.map(t => t.trim().toUpperCase())
+            if (tags && tags.length > 0) {
+                const normalizedTags = tags.map(t => t.trim().toUpperCase())
 
-            const existingTags = await tagRepository.findMany({
-                where: { name: { in: normalizedTags } }
-            })
+                const existingTags = await tx.tag.findMany({
+                    where: { name: { in: normalizedTags } }
+                })
 
-            const existingTagNames = new Set(existingTags.map(t => t.name))
-            const noExistingTags = normalizedTags.filter(t => !existingTagNames.has(t))
+                const existingTagNames = new Set(existingTags.map(t => t.name))
+                const noExistingTags = normalizedTags.filter(t => !existingTagNames.has(t))
 
-            const newTags = await tagRepository.createManyAndReturn({
-                data: noExistingTags.map(t => ({ name: t }))
-            })
+                const newTags = await tx.tag.createManyAndReturn({
+                    data: noExistingTags.map(t => ({ name: t }))
+                })
 
-            tagsToSkill = [...existingTags, ...newTags]
-        }
-
-        skillToUpdate.name = name ? name : skillToUpdate.name
-        skillToUpdate.type = type ? type : skillToUpdate.type
-        skillToUpdate.description = description ? description : skillToUpdate.description
-        skillToUpdate.duration = duration ? duration : skillToUpdate.duration
-
-
-
-        const updatedSkill = await skillRepository.update({
-            where: {
-                id: +id
-            },
-            include: {
-                tags: true
-
+                tagsToSkill = [...existingTags, ...newTags]
             }
-            ,
-            data: {
-                name: skillToUpdate.name,
-                type: skillToUpdate.type,
-                description: skillToUpdate.description,
-                duration: skillToUpdate.duration,
-                tags: {
-                    set: [],
-                    connect: tagsToSkill.map(t => ({ id: t.id }))
+
+            skillToUpdate.name = name ? name : skillToUpdate.name
+            skillToUpdate.type = type ? type : skillToUpdate.type
+            skillToUpdate.description = description ? description : skillToUpdate.description
+            skillToUpdate.duration = duration ? duration : skillToUpdate.duration
+
+
+
+            const updatedSkill = await tx.skill.update({
+                where: {
+                    id: +id
+                },
+                include: {
+                    tags: true
+
                 }
-            }
+                ,
+                data: {
+                    name: skillToUpdate.name,
+                    type: skillToUpdate.type,
+                    description: skillToUpdate.description,
+                    duration: skillToUpdate.duration,
+                    tags: {
+                        set: [],
+                        connect: tagsToSkill.map(t => ({ id: t.id }))
+                    }
+                }
+            })
+
+            return updatedSkill
         })
 
         return reply.status(200).send(updatedSkill)
@@ -159,7 +166,7 @@ export const updateSkill = async (request: FastifyRequest, reply: FastifyReply) 
     }
 }
 
-export const deleteSkil = async (request: FastifyRequest, reply: FastifyReply) => {
+export const deleteSkill = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = request.params as { id: string }
 
@@ -167,11 +174,11 @@ export const deleteSkil = async (request: FastifyRequest, reply: FastifyReply) =
             where: { id: +id }
         })
 
-        if(result.count === 0) {
-            return reply.status(401).send({ message: "Skill not found"})
+        if (result.count === 0) {
+            return reply.status(401).send({ message: "Skill not found" })
         }
 
-        return reply.status(200).send({ message: "Skill deleted"})
+        return reply.status(200).send({ message: "Skill deleted" })
     } catch (error) {
         return reply.status(500).send({ message: "Internal Server Error", error })
     }

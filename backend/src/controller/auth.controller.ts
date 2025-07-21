@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { userRepository, walletRepository } from "../database/db";
+import { prisma, userRepository } from "../database/db";
 import { UserI } from "../types/userInterfaces";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt"
@@ -14,22 +14,24 @@ export const registerUser = async (request: FastifyRequest, reply: FastifyReply)
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
-        const newUser = await userRepository.create({
-            data: {
-                name,
-                surname,
-                birthDate: new Date(birthDate),
-                email,
-                password: hashedPassword,
-                role
-            },
-        })
+        await prisma.$transaction(async (tx) => {
+            const newUser = await tx.user.create({
+                data: {
+                    name,
+                    surname,
+                    birthDate: new Date(birthDate),
+                    email,
+                    password: hashedPassword,
+                    role
+                },
+            })
 
-        await walletRepository.create({
-            data: {
-                amount: 0,
-                userId: newUser.id
-            }
+            await tx.wallet.create({
+                data: {
+                    amount: 0,
+                    userId: newUser.id
+                }
+            })
         })
 
         return reply.status(201).send({ message: "User created" })

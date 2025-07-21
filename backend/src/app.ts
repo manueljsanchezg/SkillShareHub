@@ -3,6 +3,7 @@ import fastifyJwt from "@fastify/jwt"
 import userRoutes from "./routes/user.routes"
 import authRoutes from "./routes/auth.routes"
 import skillRoutes from "./routes/skill.routes"
+import sessionRoutes from "./routes/session.routes"
 
 const app = fastify({ logger: true })
 
@@ -23,5 +24,6 @@ app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) =>
 app.register(userRoutes, { prefix: "/users" })
 app.register(authRoutes, { prefix: "/auth" })
 app.register(skillRoutes, { prefix: "/skills" })
+app.register(sessionRoutes, { prefix: "/sessions" })
 
 export default app
