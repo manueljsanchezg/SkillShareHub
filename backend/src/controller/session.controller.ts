@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { sessionRepository, skillRepository } from "../database/db";
+import { sessionRepository, skillRepository, userRepository } from "../database/db";
 import { Status } from "@prisma/client";
 
 
@@ -81,8 +81,15 @@ export const requestSession = async (request: FastifyRequest, reply: FastifyRepl
 
         if (+userId === skill.user.id) return reply.status(403).send({ message: "Unauthorized" })
 
+        const user = await userRepository.findUnique({ where: { id: +id }, include: { wallet: true}})
+
+        if(!user || !user.wallet) return reply.status(404).send({ message: "User nor found" })
+
+        if(user.wallet?.tokens < skill.tokens) return reply.status(405).send({ message: "Not enough tokens" })
+
         const newSession = await sessionRepository.create({
             data: {
+                title: `${skill.name}-${date.slice(0, 16).replace("T", " ")}`,
                 date: new Date(date),
                 status: Status.PENDING,
                 userId: +userId,

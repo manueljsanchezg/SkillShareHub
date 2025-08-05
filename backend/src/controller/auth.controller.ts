@@ -28,7 +28,7 @@ export const registerUser = async (request: FastifyRequest, reply: FastifyReply)
 
             await tx.wallet.create({
                 data: {
-                    amount: 0,
+                    tokens: 5,
                     userId: newUser.id
                 }
             })
