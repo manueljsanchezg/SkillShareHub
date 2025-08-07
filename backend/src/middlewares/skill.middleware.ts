@@ -6,7 +6,7 @@ export const loadSkill = async (request: FastifyRequest, reply: FastifyReply) =>
         const { id } = request.params as { id: string }
 
         const skillToUpdate = await skillRepository.findUnique({ where: { id: +id }, include: { tags: true } })
-        
+
         if (!skillToUpdate) return reply.status(404).send({ message: "Skill not found" })
 
         request.skillToUpdate = skillToUpdate
@@ -17,9 +17,13 @@ export const loadSkill = async (request: FastifyRequest, reply: FastifyReply) =>
 
 export const validateSkillOwner = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-        
+        const { id } = request.params as { id: string }
 
-        return reply.status(200).send()
+        const skillToUpdate = await skillRepository.findUnique({ where: { id: +id }, include: { tags: true } })
+
+        if (!skillToUpdate) return reply.status(404).send({ message: "Skill not found" })
+
+        request.skillToUpdate = skillToUpdate
     } catch (error) {
         return reply.status(500).send({ message: "Internal Server Error", error })
     }

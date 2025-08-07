@@ -101,9 +101,7 @@ export const updateSkill = async (request: FastifyRequest, reply: FastifyReply) 
 
         const { name, type, description = "", tokens, tags } = request.body as SkillI
 
-        const skillToUpdate = await skillRepository.findUnique({ where: { id: +id }, include: { tags: true } })
-
-        if (!skillToUpdate) return reply.status(404).send({ message: "Skill not found" })
+        const skillToUpdate = request.skillToUpdate!
 
         const updatedSkill = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             let tagsToSkill: Tag[] = []
