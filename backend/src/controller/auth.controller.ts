@@ -3,6 +3,7 @@ import { prisma, userRepository } from "../database/db";
 import { UserI } from "../types/userInterfaces";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt"
+import { Prisma } from "@prisma/client";
 
 export const registerUser = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -14,7 +15,7 @@ export const registerUser = async (request: FastifyRequest, reply: FastifyReply)
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const newUser = await tx.user.create({
                 data: {
                     name,

@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { sessionRepository, skillRepository, userRepository } from "../database/db";
-import { Status } from "@prisma/client";
+import { prisma, sessionRepository, skillRepository, tokenReservationRepository, transactionRepository, userRepository, walletRepository } from "../database/db";
+import { Prisma, ReservationTokenStatus, Session, SessionStatus, Skill, User, Wallet } from "@prisma/client";
+import { getPagination } from "../utils/functions";
 
 
 export const getMySessions = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -8,20 +9,10 @@ export const getMySessions = async (request: FastifyRequest, reply: FastifyReply
         const { page, pageSize } = request.query as { page?: string, pageSize?: string }
         const { userId } = request.user as { userId: string }
 
-        if (!page || !pageSize) {
-
-            const mySessions = await sessionRepository.findMany({
-                where: {
-                    userId: +userId
-                }
-            })
-
-            return reply.status(200).send(mySessions)
-        }
+        const pagination = getPagination(page, pageSize) || {}
 
         const mySessions = await sessionRepository.findMany({
-            skip: (+page - 1) * +pageSize,
-            take: +pageSize,
+            ...pagination,
             where: {
                 userId: +userId
             }
@@ -38,22 +29,10 @@ export const getSessions = async (request: FastifyRequest, reply: FastifyReply) 
         const { page, pageSize } = request.query as { page?: string, pageSize?: string }
         const { userId } = request.user as { userId: string }
 
-        if (!page || !pageSize) {
-
-            const sessions = await sessionRepository.findMany({
-                where: {
-                    userId: {
-                        not: +userId
-                    }
-                }
-            })
-
-            return reply.status(200).send(sessions)
-        }
+        const pagination = getPagination(page, pageSize) || {}
 
         const sessions = await sessionRepository.findMany({
-            skip: (+page - 1) * +pageSize,
-            take: +pageSize,
+            ...pagination,
             where: {
                 userId: {
                     not: +userId
@@ -65,37 +44,18 @@ export const getSessions = async (request: FastifyRequest, reply: FastifyReply) 
     } catch (error) {
         return reply.status(500).send({ message: "Internal Server Error", error })
     }
-
 }
-
 
 export const requestSession = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const { date } = request.body as { date: string }
-        const { id } = request.params as { id: string }
         const { userId } = request.user as { userId: string }
 
-        const skill = await skillRepository.findUnique({ where: { id: +id }, include: { user: true } })
+        const skill = request.skill!
 
-        if (!skill) return reply.status(404).send({ message: "Skill not found" })
+        const requestor = request.requestor!
 
-        if (+userId === skill.user.id) return reply.status(403).send({ message: "Unauthorized" })
-
-        const user = await userRepository.findUnique({ where: { id: +id }, include: { wallet: true}})
-
-        if(!user || !user.wallet) return reply.status(404).send({ message: "User nor found" })
-
-        if(user.wallet?.tokens < skill.tokens) return reply.status(405).send({ message: "Not enough tokens" })
-
-        const newSession = await sessionRepository.create({
-            data: {
-                title: `${skill.name}-${date.slice(0, 16).replace("T", " ")}`,
-                date: new Date(date),
-                status: Status.PENDING,
-                userId: +userId,
-                skillId: +id
-            }
-        })
+        const newSession = requestSessionTransaction(skill, date, +userId, requestor.wallet)
 
         return reply.status(200).send(newSession);
     } catch (error) {
@@ -103,45 +63,121 @@ export const requestSession = async (request: FastifyRequest, reply: FastifyRepl
     }
 }
 
-export const actionSession = async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-        const { id, action } = request.params as { id: string, action: string }
-        const { userId } = request.user as { userId: string }
-
-        const validActions = ["accepted", "rejected"]
-
-        if (!validActions.includes(action)) {
-            return reply.status(403).send({ message: "Action not found" })
-        }
-
-        const session = await sessionRepository.findUnique({
-            where: { id: +id },
-            include: {
-                skill: true
+async function requestSessionTransaction(
+    skill: Skill,
+    date: string,
+    userId: number, requestorWalltet: Wallet
+) {
+    const newSession = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const newSession = await tx.session.create({
+            data: {
+                title: `${skill.name}-${date.slice(0, 16).replace("T", " ")}`,
+                date: new Date(date),
+                status: SessionStatus.PENDING,
+                userId: +userId,
+                skillId: skill.id
             }
         })
 
-        if (!session) return reply.status(404).send({ message: "Session not found" })
-
-        if (session.skill.userId !== +userId) {
-            return reply.status(401).send({ message: "Unauthorized" })
-        }
-
-        if (session.status !== Status.PENDING) {
-            return reply.status(400).send({ message: "Session already handled" })
-        }
-
-        const updatedSession = await sessionRepository.update({
+        await tx.wallet.update({
             where: {
-                id: +id
+                userId: +userId
             },
             data: {
-                status: action === "accepted" ? Status.ACCEPTED : Status.REJECTED
+                tokens: requestorWalltet.tokens - skill.tokens
             }
         })
+
+        await tx.tokenReservation.create({
+            data: {
+                tokens: skill.tokens,
+                userId: +userId,
+                sessionId: newSession.id
+            }
+        })
+
+        return newSession
+    })
+    return newSession
+}
+
+export const actionSession = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = request.params as { id: string }
+
+        const action = request.action!
+
+        const session = request.extendedSession!
+
+        const senderWallet = session.user.wallet!
+
+        const receiverWallet = session.skill.user.wallet!
+
+        const updatedSession = actionSessionTransaction(+id, action, session.skill.tokens, senderWallet, receiverWallet)
 
         return reply.status(200).send(updatedSession);
     } catch (error) {
         return reply.status(500).send({ message: "Internal Server Error", error })
     }
+}
+
+async function actionSessionTransaction(
+    id: number,
+    action: string,
+    tokens: number,
+    senderWallet: Wallet,
+    receiverWallet: Wallet
+) {
+    const updatedSession = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const updatedSession = await tx.session.update({
+            where: {
+                id: id
+            },
+            data: {
+                status: action === "accepted" ? SessionStatus.ACCEPTED : SessionStatus.REJECTED
+            }
+        })
+
+        await tx.tokenReservation.update({
+            where: {
+                sessionId: id
+            },
+            data: {
+                status: action === "accepted" ? ReservationTokenStatus.COMPLETED : ReservationTokenStatus.RETURNED
+            }
+        })
+
+        if (action === "accepted") {
+            await tx.transaction.create({
+                data: {
+                    tokens: tokens,
+                    senderWalletId: senderWallet.id,
+                    receiverWalletId: receiverWallet.id,
+                    sessionId: id
+                }
+            })
+
+            await tx.wallet.update({
+                where: {
+                    userId: receiverWallet.userId
+                },
+                data: {
+                    tokens: receiverWallet.tokens + tokens
+                }
+            })
+        } else {
+            await tx.wallet.update({
+                where: {
+                    userId: senderWallet.userId
+                },
+                data: {
+                    tokens: senderWallet.tokens + tokens
+                }
+            })
+        }
+
+        return updatedSession
+    })
+
+    return updatedSession
 }

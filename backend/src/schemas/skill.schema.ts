@@ -5,7 +5,7 @@ export const createSkillSchema = {
         .prop('name', S.string().maxLength(50).required())
         .prop('type', S.string().required())
         .prop('description', S.string())
-        .prop('duration', S.number().minimum(1).required())
+        .prop('tokens', S.number().minimum(1).required())
         .prop('tags', S.array().items(S.string()))
 }
 

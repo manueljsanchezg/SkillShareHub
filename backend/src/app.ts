@@ -12,7 +12,7 @@ app.register(fastifyJwt, { secret: 'secret' })
 app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
   try {
 
-    if(request.url === "/auth/login" || request.url === "/auth/register") return
+    if(request.url === "/api/v1/auth/login" || request.url === "/api/v1/auth/register") return
 
     const decoded = await request.jwtVerify()
     request.user = decoded
@@ -21,9 +21,9 @@ app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) =>
   }
 })
 
-app.register(userRoutes, { prefix: "/users" })
-app.register(authRoutes, { prefix: "/auth" })
-app.register(skillRoutes, { prefix: "/skills" })
-app.register(sessionRoutes, { prefix: "/sessions" })
+app.register(userRoutes, { prefix: "/api/v1/users" })
+app.register(authRoutes, { prefix: "/api/v1/auth" })
+app.register(skillRoutes, { prefix: "/api/v1/skills" })
+app.register(sessionRoutes, { prefix: "/api/v1/sessions" })
 
 export default app
