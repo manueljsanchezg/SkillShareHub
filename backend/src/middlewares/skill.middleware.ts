@@ -15,6 +15,8 @@ export const loadSkill = async (request: FastifyRequest, reply: FastifyReply) =>
     }
 }
 
+// Comment
+
 export const validateSkillOwner = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = request.params as { id: string }
