@@ -6,6 +6,7 @@ import { createSkillSchema, getSkillSchema, updateSkillSchema } from "../schemas
 import { requestSession } from "../controller/session.controller"
 import { requestSessionschema } from "../schemas/session.schema"
 import { loadSkill, validateRequestor, validateUserNotSkillOwner } from "../middlewares/session.middleware"
+import { loadSkillToUpdate, validateSkillOwner } from "../middlewares/skill.middleware"
 
 
 export default async function skillRoutes(fastify: FastifyInstance) {
@@ -40,7 +41,9 @@ export default async function skillRoutes(fastify: FastifyInstance) {
         { 
             schema: updateSkillSchema
             , onRequest: [
-                checkRole(Role.USER)
+                checkRole(Role.USER),
+                loadSkillToUpdate,
+                validateSkillOwner
             ] 
         }, 
         updateSkill)

@@ -159,6 +159,7 @@ export const updateSkill = async (request: FastifyRequest, reply: FastifyReply) 
     }
 }
 
+
 export const deleteSkill = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = request.params as { id: string }
