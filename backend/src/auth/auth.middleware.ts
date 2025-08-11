@@ -22,3 +22,13 @@ export function checkRole(requiredRole: Role) {
     }
   }
 }
+
+export const validateBirthDate = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { birthDate } = request.body as { birthDate: string }
+
+    const birth = new Date(birthDate)
+
+    const now = new Date()
+
+    if(birth > now) return reply.status(400).send({ message: "Birth date must be before than now" })
+}

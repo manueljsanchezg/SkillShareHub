@@ -9,9 +9,15 @@ export const createSkillSchema = {
         .prop('tags', S.array().items(S.string()))
 }
 
+export const getSkillsSchema = {
+    querystring: S.object()
+            .prop('page', S.string().pattern("^\\d+$"))
+            .prop('pageSize', S.string().pattern("^\\d+$"))
+}
+
 export const getSkillSchema = {
     params: S.object()
-        .prop('id', S.string().required())
+        .prop('id', S.string().pattern("^\\d+$").required())
 }
 
 export const updateSkillSchema = {
@@ -19,8 +25,8 @@ export const updateSkillSchema = {
         .prop('name', S.string().maxLength(50))
         .prop('type', S.string())
         .prop('description', S.string())
-        .prop('duration', S.number().minimum(1))
+        .prop('tokens', S.number().minimum(1))
         .prop('tags', S.array().items(S.string())),
     params: S.object()
-        .prop('id', S.string().required())
+        .prop('id', S.string().pattern("^\\d+$").required())
 }

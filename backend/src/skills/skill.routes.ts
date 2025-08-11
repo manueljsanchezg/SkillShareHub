@@ -1,18 +1,19 @@
 import { FastifyInstance } from "fastify"
-import { createSkill, getSkills, getSkill, updateSkill, deleteSkill } from "../controller/skill.controller"
-import { checkRole } from "../middlewares/auth.middleware"
+import { createSkill, getSkills, getSkill, updateSkill, deleteSkill } from "./skill.controller"
+import { checkRole } from "../auth/auth.middleware"
 import { Role } from "@prisma/client"
-import { createSkillSchema, getSkillSchema, updateSkillSchema } from "../schemas/skill.schema"
-import { requestSession } from "../controller/session.controller"
-import { requestSessionschema } from "../schemas/session.schema"
-import { loadSkill, validateRequestor, validateUserNotSkillOwner } from "../middlewares/session.middleware"
-import { loadSkillToUpdate, validateSkillOwner } from "../middlewares/skill.middleware"
+import { createSkillSchema, getSkillSchema, getSkillsSchema, updateSkillSchema } from "./skill.schema"
+import { getSessionsReceived, requestSession } from "../sessions/session.controller"
+import { requestSessionschema } from "../sessions/session.schema"
+import { loadSkill, validateDate, validateOneSessionPerDay, validateRequestor, validateUserNotSkillOwner } from "../sessions/session.middleware"
+import { loadSkillToUpdate, validateSkillOwner } from "./skill.middleware"
 
 
 export default async function skillRoutes(fastify: FastifyInstance) {
 
     fastify.get("/",
         {
+            schema: getSkillsSchema,
             onRequest: [
                 checkRole(Role.USER)
             ]
@@ -50,6 +51,7 @@ export default async function skillRoutes(fastify: FastifyInstance) {
 
     fastify.delete("/:id",
         {
+            schema: getSkillSchema,
             onRequest: [
                 checkRole(Role.USER)
             ]
@@ -64,7 +66,20 @@ export default async function skillRoutes(fastify: FastifyInstance) {
                 loadSkill,
                 validateUserNotSkillOwner,
                 validateRequestor
+            ],
+            preValidation: [
+                validateDate,
+                validateOneSessionPerDay
             ]
         },
         requestSession)
+
+        fastify.get("/:id/sessions-received",
+        {
+            onRequest: [
+                checkRole(Role.USER),
+                validateSkillOwner
+            ]
+        },
+        getSessionsReceived)
 }

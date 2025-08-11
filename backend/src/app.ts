@@ -1,16 +1,22 @@
 import fastify, { FastifyReply, FastifyRequest } from "fastify"
 import fastifyJwt from "@fastify/jwt"
-import userRoutes from "./routes/user.routes"
-import authRoutes from "./routes/auth.routes"
-import skillRoutes from "./routes/skill.routes"
-import sessionRoutes from "./routes/session.routes"
+import userRoutes from "./users/user.routes"
+import authRoutes from "./auth/auth.routes"
+import skillRoutes from "./skills/skill.routes"
+import sessionRoutes from "./sessions/session.routes"
+import tagRoutes from "./tags/tag.routes"
+import S from "fluent-json-schema"
 
-const app = fastify({ logger: true })
+const app = fastify({ logger: true, ajv: { customOptions: {
+  removeAdditional: false
+}} })
 
-app.register(fastifyJwt, { secret: 'secret' })
+app.register(fastifyJwt, { secret: "secret" })
 
 app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
   try {
+
+    console.log(request.url)
 
     if(request.url === "/api/v1/auth/login" || request.url === "/api/v1/auth/register") return
 
@@ -21,9 +27,23 @@ app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) =>
   }
 })
 
-app.register(userRoutes, { prefix: "/api/v1/users" })
-app.register(authRoutes, { prefix: "/api/v1/auth" })
-app.register(skillRoutes, { prefix: "/api/v1/skills" })
-app.register(sessionRoutes, { prefix: "/api/v1/sessions" })
+const PREFIX = "/api/v1"
+
+const schema = {
+  body: S.object()
+    .prop('name', S.string())
+    .additionalProperties(false)
+}
+
+app.put('/api/v1/test', { schema }, async (req, reply) => {
+  console.log('Request body:', req.body)
+  return { msg: "ok" }
+})
+
+app.register(userRoutes, { prefix: `${PREFIX}/users` })
+app.register(authRoutes, { prefix: `${PREFIX}/auth` })
+app.register(skillRoutes, { prefix: `${PREFIX}/skills` })
+app.register(sessionRoutes, { prefix: `${PREFIX}/sessions` })
+app.register(tagRoutes, { prefix: `${PREFIX}/tags` })
 
 export default app

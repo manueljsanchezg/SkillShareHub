@@ -29,7 +29,7 @@ export const registerUser = async (request: FastifyRequest, reply: FastifyReply)
 
             await tx.wallet.create({
                 data: {
-                    tokens: 5,
+                    tokens: 50,
                     userId: newUser.id
                 }
             })
@@ -55,7 +55,7 @@ export const loginUser = async (request: FastifyRequest, reply: FastifyReply) =>
 
         const payload = { userId: userExists.id, email: userExists.email, role: userExists.role }
 
-        const jwtToken = jwt.sign(payload, 'secret', { expiresIn: '1h' })
+        const jwtToken = jwt.sign(payload, "secret", { expiresIn: '2h' })
 
         return reply.status(200).send({ message: "User logged", jwtToken })
     } catch (error) {

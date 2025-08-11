@@ -18,10 +18,14 @@ export const loadSkillToUpdate = async (request: FastifyRequest, reply: FastifyR
 export const validateSkillOwner = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = request.params as { id: string }
+        
+        const { userId } = request.user as { userId: string }
 
         const skillToUpdate = await skillRepository.findUnique({ where: { id: +id }, include: { tags: true } })
 
         if (!skillToUpdate) return reply.status(404).send({ message: "Skill not found" })
+
+        if(skillToUpdate.userId !== +userId) return reply.status(403).send({ message: "Unauthorized" })
 
         request.skillToUpdate = skillToUpdate
     } catch (error) {

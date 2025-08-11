@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma, skillRepository } from "../database/db.ts";
 import { SkillI, Tag } from "../types/skillInterfaces";
-import { Prisma } from "@prisma/client";
+import { Prisma, Skill } from "@prisma/client";
 import { getPagination } from "../utils/functions.ts";
 
 export const getSkills = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -47,7 +47,7 @@ export const createSkill = async (request: FastifyRequest, reply: FastifyReply) 
 
         const normalizedTags = skill.tags.map(t => t.trim().toUpperCase())
 
-        const newSkill = createSkillTransaction(skill, normalizedTags, +userId)
+        const newSkill = await createSkillTransaction(skill, normalizedTags, +userId)
 
         return reply.status(201).send({ message: "Skill created", newSkill })
     } catch (error) {
@@ -101,62 +101,75 @@ export const updateSkill = async (request: FastifyRequest, reply: FastifyReply) 
 
         const { name, type, description = "", tokens, tags } = request.body as SkillI
 
-        const skillToUpdate = request.skillToUpdate!
+        const skillToUpdate: Skill & { tags: Tag[] } = request.skillToUpdate!
 
-        const updatedSkill = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-            let tagsToSkill: Tag[] = []
-
-            if (tags && tags.length > 0) {
-                const normalizedTags = tags.map(t => t.trim().toUpperCase())
-
-                const existingTags = await tx.tag.findMany({
-                    where: { name: { in: normalizedTags } }
-                })
-
-                const existingTagNames = new Set(existingTags.map((t: { name: string }) => t.name))
-                const noExistingTags = normalizedTags.filter(t => !existingTagNames.has(t))
-
-                const newTags = await tx.tag.createManyAndReturn({
-                    data: noExistingTags.map(t => ({ name: t }))
-                })
-
-                tagsToSkill = [...existingTags, ...newTags]
-            }
-
-            skillToUpdate.name = name ? name : skillToUpdate.name
-            skillToUpdate.type = type ? type : skillToUpdate.type
-            skillToUpdate.description = description ? description : skillToUpdate.description
-            skillToUpdate.tokens = tokens ? tokens : skillToUpdate.tokens
-
-
-
-            const updatedSkill = await tx.skill.update({
-                where: {
-                    id: +id
-                },
-                include: {
-                    tags: true
-                }
-                ,
-                data: {
-                    name: skillToUpdate.name,
-                    type: skillToUpdate.type,
-                    description: skillToUpdate.description,
-                    tokens: skillToUpdate.tokens,
-                    tags: {
-                        set: [],
-                        connect: tagsToSkill.map(t => ({ id: t.id }))
-                    }
-                }
-            })
-
-            return updatedSkill
-        })
+        const updatedSkill = await updateSkillTransaction(+id, skillToUpdate, name, type, description, tokens, tags)
 
         return reply.status(200).send(updatedSkill)
     } catch (error) {
         return reply.status(500).send({ message: "Internal Server Error", error })
     }
+}
+
+async function updateSkillTransaction(
+    id: number,
+    skillToUpdate: Skill & { tags: Tag[] },
+    name: string,
+    type: string,
+    description: string,
+    tokens: number,
+    tags: string[]
+) {
+    const updatedSkill = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        let tagsToSkill: Tag[] = []
+
+        if (tags && tags.length > 0) {
+            const normalizedTags = tags.map(t => t.trim().toUpperCase())
+
+            const existingTags = await tx.tag.findMany({
+                where: { name: { in: normalizedTags } }
+            })
+
+            const existingTagNames = new Set(existingTags.map((t: { name: string }) => t.name))
+            const noExistingTags = normalizedTags.filter(t => !existingTagNames.has(t))
+
+            const newTags = await tx.tag.createManyAndReturn({
+                data: noExistingTags.map(t => ({ name: t }))
+            })
+
+            tagsToSkill = [...existingTags, ...newTags]
+        }
+
+        const dataToUpdate: any = {
+            name: name ?? skillToUpdate.name,
+            type: type ?? skillToUpdate.type,
+            description: description ?? skillToUpdate.description,
+            tokens: tokens ?? skillToUpdate.tokens
+        }
+
+        if (tags && tags.length > 0) {
+            dataToUpdate.tags = {
+                set: [], 
+                connect: tagsToSkill.map(t => ({ id: t.id }))
+            }
+        }
+
+        const updatedSkill = await tx.skill.update({
+            where: {
+                id: id
+            },
+            include: {
+                tags: true
+            }
+            ,
+            data: dataToUpdate
+        })
+
+        return updatedSkill
+    })
+
+    return updatedSkill
+
 }
 
 

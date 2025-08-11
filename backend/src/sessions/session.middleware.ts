@@ -4,6 +4,42 @@ import { SessionStatus, User, Wallet } from "@prisma/client";
 
 /* Request session middlewares*/
 
+export const validateDate = async (request: FastifyRequest, reply: FastifyReply) => {
+
+    const { date } = request.body as { date: string }
+
+    console.log("Hola", date)
+
+    const sessionDate = new Date(date)
+
+    const now = new Date()
+
+    if (now > sessionDate) return reply.status(400).send({ message: "Date must be after than now" })
+}
+
+export const validateOneSessionPerDay = async (request: FastifyRequest, reply: FastifyReply) => {
+
+    const { date } = request.body as { date: string }
+
+    const { id } = request.params as { id: string }
+
+    const startOfDay = new Date(date.slice(0, 10) + 'T00:00:00Z')
+    const endOfDay = new Date(date.slice(0, 10) + 'T23:59:59Z')
+
+    const session = await sessionRepository.findFirst({
+        where: {
+            skillId: +id,
+            date: {
+                gte: startOfDay,
+                lte: endOfDay
+            }
+        }
+    })
+
+    if (session) return reply.status(400).send({ message: "Can't request more tha one session in a day" })
+
+}
+
 export const loadSkill = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = request.params as { id: string }
@@ -113,7 +149,9 @@ export const validateUserNotSessionOwner = async (request: FastifyRequest, reply
 
 export const validateSessionStatus = async (request: FastifyRequest, reply: FastifyReply) => {
 
-    const extendedSession = request.extendedSession!
+    const extendedSession = request.extendedSession as any
 
-    if (extendedSession.session?.status !== SessionStatus.PENDING) return reply.status(400).send({ message: "Session already handled" })
+    console.log(extendedSession)
+
+    if (extendedSession.status !== SessionStatus.PENDING) return reply.status(400).send({ message: "Session already handled" })
 }

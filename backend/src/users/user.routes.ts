@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { checkRole } from "../middlewares/auth.middleware";
-import { getUser, getUsers } from "../controller/user.controller";
-import { getUsersSchema } from "../schemas/user.schema";
+import { checkRole } from "../auth/auth.middleware";
+import { getProfile, getUser, getUsers } from "./user.controller";
+import { deleteUserSchema, getUsersSchema } from "./user.schema";
 import { Role } from "@prisma/client";
 
 export default async function userRoutes(fastify: FastifyInstance) {
@@ -28,4 +28,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
             ]
         },
         getUser)
+
+    fastify.get("/profile",
+        {
+        },
+        getProfile)
+
+    fastify.delete("/:id",
+        {
+            schema: deleteUserSchema,
+            onRequest: [
+                checkRole(Role.ADMIN)
+            ]
+        },
+        getUser)
+
 }

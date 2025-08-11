@@ -5,3 +5,8 @@ export const getUsersSchema = {
         .prop('page', S.string().pattern("^\\d+$").required())
         .prop('pageSize', S.string().pattern("^\\d+$").required())
 }
+
+export const deleteUserSchema = {
+    params: S.object()
+        .prop('id', S.string().pattern("^\\d+$").required())
+}

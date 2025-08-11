@@ -1,6 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { prisma, sessionRepository, skillRepository, tokenReservationRepository, transactionRepository, userRepository, walletRepository } from "../database/db";
-import { Prisma, ReservationTokenStatus, Session, SessionStatus, Skill, User, Wallet } from "@prisma/client";
+import { prisma, sessionRepository, skillRepository } from "../database/db";
+import { Prisma, ReservationTokenStatus, SessionStatus, Skill, Wallet } from "@prisma/client";
 import { getPagination } from "../utils/functions";
 
 
@@ -15,6 +15,27 @@ export const getMySessions = async (request: FastifyRequest, reply: FastifyReply
             ...pagination,
             where: {
                 userId: +userId
+            }
+        })
+
+        return reply.status(200).send(mySessions);
+    } catch (error) {
+        return reply.status(500).send({ message: "Internal Server Error", error })
+    }
+}
+
+export const getSessionsReceived = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { page, pageSize } = request.query as { page?: string, pageSize?: string }
+        
+        const { id } = request.params as { id: string }
+
+        const pagination = getPagination(page, pageSize) || {}
+
+        const mySessions = await sessionRepository.findMany({
+            ...pagination,
+            where: {
+                skillId: +id
             }
         })
 
@@ -49,13 +70,18 @@ export const getSessions = async (request: FastifyRequest, reply: FastifyReply) 
 export const requestSession = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const { date } = request.body as { date: string }
+        
+        console.log(date)
+
         const { userId } = request.user as { userId: string }
+
+        console.log(userId)
 
         const skill = request.skill!
 
         const requestor = request.requestor!
 
-        const newSession = requestSessionTransaction(skill, date, +userId, requestor.wallet)
+        const newSession = await requestSessionTransaction(skill, date, +userId, requestor.wallet)
 
         return reply.status(200).send(newSession);
     } catch (error) {
@@ -113,7 +139,7 @@ export const actionSession = async (request: FastifyRequest, reply: FastifyReply
 
         const receiverWallet = session.skill.user.wallet!
 
-        const updatedSession = actionSessionTransaction(+id, action, session.skill.tokens, senderWallet, receiverWallet)
+        const updatedSession = await actionSessionTransaction(+id, action, session.skill.tokens, senderWallet, receiverWallet)
 
         return reply.status(200).send(updatedSession);
     } catch (error) {

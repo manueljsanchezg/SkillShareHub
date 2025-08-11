@@ -1,13 +1,16 @@
+import dotenv from "dotenv"
 import { prisma } from './database/db'
 import app from './app';
 
-const PORT = 3000
+dotenv.config()
+
+const PORT = Number(process.env.PORT) || 4000
 
 const start = async () => {
   try {
     await prisma.$connect()
     console.log(`Prisma connected`)
-    await app.listen({ port: PORT });
+    app.listen({ port: PORT });
     console.log(`Server running on PORT ${PORT}`)
   } catch (error) {
     console.error("Error al iniciar el servidor:", error)
